@@ -1,5 +1,6 @@
 const { addUser, updateUserPosition, removeUser, getUsers } = require('../store/userStore');
 const { getConnections } = require('../utils/proximity');
+const Message = require('../models/Message');
 
 const PROXIMITY_RADIUS = 150; // Interaction boundary distance
 let previousConnections = {}; // Stores previous connection state separately
@@ -57,6 +58,43 @@ const socketHandler = (io) => {
       removeUser(socket.id);
       io.emit('users', getUsers());
       handleConnectionStateChanges(io); // Recalculate clusters on sudden drops
+    });
+
+    // --- Persisted State (MongoDB) ---
+    // Safely writes payloads to Mongoose Schema before dropping them across the native wire
+    socket.on('send_message', async ({ receiverId, message }) => {
+      try {
+        const payload = new Message({
+          senderId: socket.id,
+          receiverId,
+          message
+        });
+        await payload.save();
+
+        io.to(receiverId).emit('receive_message', {
+          senderId: socket.id,
+          message: payload.message,
+          createdAt: payload.createdAt
+        });
+      } catch (err) {
+        console.error('Memory persistence failed:', err);
+      }
+    });
+
+    // Loads chronological historical chunks from the Database directly to the requester
+    socket.on('fetch_messages', async (peerId) => {
+      try {
+        const history = await Message.find({
+          $or: [
+            { senderId: socket.id, receiverId: peerId },
+            { senderId: peerId, receiverId: socket.id }
+          ]
+        }).sort({ createdAt: 1 });
+
+        socket.emit('messages_history', history);
+      } catch (err) {
+        console.error('Failed to buffer chat payload:', err);
+      }
     });
   });
 };
