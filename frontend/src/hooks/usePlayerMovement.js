@@ -10,10 +10,12 @@ const usePlayerMovement = (initialX = window.innerWidth / 2, initialY = window.i
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      console.log('KEY DOWN:', e.key);
       keys.current[e.key] = true;
     };
 
     const handleKeyUp = (e) => {
+      console.log('KEY UP:', e.key);
       keys.current[e.key] = false;
     };
 
