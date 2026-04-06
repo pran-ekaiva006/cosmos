@@ -26,11 +26,22 @@ const handleConnectionStateChanges = (io) => {
 
     // Target the specific user with newly connected entities
     if (newConnections.length > 0) {
+      newConnections.forEach(peerId => {
+        // Deterministic room assignment ID
+        const roomId = [socketId, peerId].sort().join('-');
+        const socketInstance = io.sockets.sockets.get(socketId);
+        if (socketInstance) socketInstance.join(roomId);
+      });
       io.to(socketId).emit('user_connected', newConnections);
     }
     
     // Target the specific user with newly dropped entities
     if (removedConnections.length > 0) {
+      removedConnections.forEach(peerId => {
+        const roomId = [socketId, peerId].sort().join('-');
+        const socketInstance = io.sockets.sockets.get(socketId);
+        if (socketInstance) socketInstance.leave(roomId);
+      });
       io.to(socketId).emit('user_disconnected', removedConnections);
     }
   });
@@ -64,6 +75,14 @@ const socketHandler = (io) => {
     // Safely writes payloads to Mongoose Schema before dropping them across the native wire
     socket.on('send_message', async ({ receiverId, message }) => {
       try {
+        const roomId = [socket.id, receiverId].sort().join('-');
+
+        // Domain Restrict: Only actively connected (in proximity) users can send messages
+        if (!socket.rooms.has(roomId)) {
+          console.warn(`Blocked message delivery: User ${socket.id} is not geographically connected to ${receiverId}`);
+          return;
+        }
+
         const payload = new Message({
           senderId: socket.id,
           receiverId,
@@ -71,7 +90,8 @@ const socketHandler = (io) => {
         });
         await payload.save();
 
-        io.to(receiverId).emit('receive_message', {
+        // Relay exactly across the private deterministic room
+        socket.to(roomId).emit('receive_message', {
           senderId: socket.id,
           message: payload.message,
           createdAt: payload.createdAt
