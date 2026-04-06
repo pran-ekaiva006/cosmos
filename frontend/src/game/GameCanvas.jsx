@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import * as PIXI from 'pixi.js';
 
-const GameCanvas = ({ position }) => {
+const GameCanvas = ({ position, users, socketId }) => {
   const pixiContainer = useRef(null);
   const appRef = useRef(null);
   const playerRef = useRef(null);
+  const othersRef = useRef({});
 
   // Sync React position to PixiJS
   useEffect(() => {
@@ -13,6 +14,40 @@ const GameCanvas = ({ position }) => {
       playerRef.current.y = position.y;
     }
   }, [position]);
+
+  // Sync remote users recursively
+  useEffect(() => {
+    if (!appRef.current || !users) return;
+
+    // Purge disconnected users from Pixi canvas
+    Object.keys(othersRef.current).forEach((id) => {
+      if (!users[id] || id === socketId) {
+        appRef.current.stage.removeChild(othersRef.current[id]);
+        othersRef.current[id].destroy();
+        delete othersRef.current[id];
+      }
+    });
+
+    // Render or move active users natively
+    Object.keys(users).forEach((id) => {
+      if (id === socketId) return; // Native player is scaled and processed above
+      
+      const pos = users[id];
+      if (pos && pos.x !== null && pos.y !== null) {
+        // If they don't exist in abstract memory yet, draw them now
+        if (!othersRef.current[id]) {
+          const remotePlayer = new PIXI.Graphics();
+          remotePlayer.circle(0, 0, 20);
+          remotePlayer.fill(0xff3366); // Make enemies distinct pinkish-red
+          appRef.current.stage.addChild(remotePlayer);
+          othersRef.current[id] = remotePlayer;
+        }
+        // Always mutate physics without tracking state array
+        othersRef.current[id].x = pos.x;
+        othersRef.current[id].y = pos.y;
+      }
+    });
+  }, [users, socketId]);
 
   useEffect(() => {
     let isMounted = true;

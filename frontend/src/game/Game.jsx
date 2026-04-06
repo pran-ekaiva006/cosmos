@@ -1,12 +1,21 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import GameCanvas from './GameCanvas';
 import usePlayerMovement from '../hooks/usePlayerMovement';
 import socket from '../socket/socket';
 
 const Game = () => {
   const { position } = usePlayerMovement();
+  const [users, setUsers] = useState({});
   const lastEmitTime = useRef(0);
   const emitTimeout = useRef(null);
+
+  // Sync users dictionary from network
+  useEffect(() => {
+    socket.on('users', (serverUsers) => {
+      setUsers(serverUsers);
+    });
+    return () => socket.off('users');
+  }, []);
 
   // Throttled Network Emission (100ms limit)
   useEffect(() => {
@@ -52,7 +61,7 @@ const Game = () => {
       }}>
         Cosmos Environment
       </h1>
-      <GameCanvas position={position} />
+      <GameCanvas position={position} users={users} socketId={socket.id} />
     </div>
   );
 };
