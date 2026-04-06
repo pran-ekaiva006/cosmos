@@ -1,7 +1,10 @@
 import React from 'react';
 import GameCanvas from './GameCanvas';
+import usePlayerMovement from '../hooks/usePlayerMovement';
 
 const Game = () => {
+  const { position } = usePlayerMovement();
+
   return (
     <div style={{
       display: 'flex',
@@ -21,7 +24,7 @@ const Game = () => {
       }}>
         Cosmos Environment
       </h1>
-      <GameCanvas />
+      <GameCanvas position={position} />
     </div>
   );
 };

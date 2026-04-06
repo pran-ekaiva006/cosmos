@@ -1,9 +1,18 @@
 import React, { useEffect, useRef } from 'react';
 import * as PIXI from 'pixi.js';
 
-const GameCanvas = () => {
+const GameCanvas = ({ position }) => {
   const pixiContainer = useRef(null);
   const appRef = useRef(null);
+  const playerRef = useRef(null);
+
+  // Sync React position to PixiJS
+  useEffect(() => {
+    if (playerRef.current && position) {
+      playerRef.current.x = position.x;
+      playerRef.current.y = position.y;
+    }
+  }, [position]);
 
   useEffect(() => {
     let isMounted = true;
@@ -12,7 +21,7 @@ const GameCanvas = () => {
     const initPixi = async () => {
       // Create new Pixi application
       app = new PIXI.Application();
-      
+
       // Initialize asynchronously (required in PIXI v8)
       await app.init({
         width: window.innerWidth,
@@ -35,23 +44,24 @@ const GameCanvas = () => {
         pixiContainer.current.appendChild(app.canvas);
       }
 
-      // Draw the player circle using modern PIXI v8 API
+      // player circle using modern PIXI v8 API
       const player = new PIXI.Graphics();
       player.circle(0, 0, 20);
-      player.fill(0x00d2ff); 
+      player.fill(0x00d2ff);
 
-      // Center exactly
-      player.x = app.screen.width / 2;
-      player.y = app.screen.height / 2;
+      // Center exactly (only on init)
+      player.x = position ? position.x : app.screen.width / 2;
+      player.y = position ? position.y : app.screen.height / 2;
 
       app.stage.addChild(player);
+      playerRef.current = player;
     };
 
     if (!appRef.current) {
       initPixi();
     }
 
-    // Cleanup phase: remove canvas and permanently destroy references to avoid bleeding context memory
+
     return () => {
       isMounted = false;
       if (appRef.current) {
